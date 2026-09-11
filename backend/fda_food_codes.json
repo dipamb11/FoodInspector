@@ -1,0 +1,430 @@
+[
+  {
+    "category": "Snack Food - Wheat Grain Snack, Baked",
+    "aliases": [
+      "wheat grain snack",
+      "baked wheat snack",
+      "whole wheat snack",
+      "cracked wheat snack",
+      "wheat",
+      "wheat snack",
+      "wheat crackers",
+      "baked grain snack",
+      "grain snack"
+    ],
+    "product_code": "07I--04",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Wheat Grain Snack (Whole, Cracked, Split), Baked."
+  },
+  {
+    "category": "Snack Food - Wheat Grain Snack, Fried/Oil Cooked",
+    "aliases": [
+      "fried wheat snack",
+      "oil-cooked wheat snack",
+      "fried grain snack",
+      "wheat",
+      "wheat snack",
+      "fried wheat"
+    ],
+    "product_code": "07J--04",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Wheat Grain Snack (Whole, Cracked, Split), Fried/Oil Cooked."
+  },
+  {
+    "category": "Snack Food - Potato/Vegetable Snack, Baked",
+    "aliases": [
+      "potato snack",
+      "baked potato snack",
+      "baked vegetable snack",
+      "potato chips",
+      "potato",
+      "chips",
+      "vegetable snack",
+      "veggie chips",
+      "baked chips",
+      "potato crisps"
+    ],
+    "product_code": "07Q--07",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Potato Snacks (Flavored or Unflavored), Vegetable Snacks (Other than Pulses), Baked."
+  },
+  {
+    "category": "Snack Food - Potato Starch Snack, Baked",
+    "aliases": [
+      "potato starch snack",
+      "baked potato starch snack",
+      "potato-based snack",
+      "potato starch",
+      "starch snack"
+    ],
+    "product_code": "07S--02",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Potato Starch Snacks, Baked."
+  },
+  {
+    "category": "Snack Food - Potato Starch Snack, Fried/Oil Cooked",
+    "aliases": [
+      "fried potato starch snack",
+      "oil-cooked potato starch snack",
+      "potato starch",
+      "starch snack",
+      "fried potato snack"
+    ],
+    "product_code": "07T--02",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Potato Starch Snacks, Fried/Oil Cooked."
+  },
+  {
+    "category": "Snack Food - Fried Snack Foods, N.E.C.",
+    "aliases": [
+      "fried snack",
+      "fried snack food",
+      "hot mix",
+      "bombay mix",
+      "chanachur",
+      "fried mix"
+    ],
+    "product_code": "07B--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Fried Snack Foods, N.E.C. (example: Hot Chanachur; Bombay Mix)."
+  },
+  {
+    "category": "Snack Food - Starch Snacks, N.E.C., Fried/Oil Cook",
+    "aliases": [
+      "starch snack",
+      "fried starch snack",
+      "extruded snack",
+      "puffed snack",
+      "corn snack",
+      "cheese puffs",
+      "puffed corn"
+    ],
+    "product_code": "07T--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Starch Snacks, n.e.c., Fried/Oil Cook."
+  },
+  {
+    "category": "Snack Food - Snacks, N.E.C.",
+    "aliases": [
+      "snack foods",
+      "specialty snacks",
+      "mixed snacks",
+      "snack mix",
+      "snack",
+      "snacks",
+      "trail mix",
+      "party mix",
+      "chex mix",
+      "snack pack"
+    ],
+    "product_code": "07Y--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Snack Foods Not Elsewhere Mentioned, N.E.C."
+  },
+  {
+    "category": "Nuts - Peanut, In Shell",
+    "aliases": [
+      "peanuts in shell",
+      "in-shell peanuts",
+      "shell peanuts",
+      "whole peanuts in shell",
+      "peanut",
+      "peanuts",
+      "in shell"
+    ],
+    "product_code": "23A--07",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Peanut, In Shell."
+  },
+  {
+    "category": "Nuts - Peanut, Shelled",
+    "aliases": [
+      "shelled peanuts",
+      "roasted peanuts",
+      "salted peanuts",
+      "peanut kernels",
+      "peanut",
+      "peanuts",
+      "shelled peanut"
+    ],
+    "product_code": "23B--07",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Peanut, Shelled."
+  },
+  {
+    "category": "Nuts - Cashew, Shelled",
+    "aliases": [
+      "cashews",
+      "shelled cashews",
+      "cashew nuts",
+      "roasted cashews",
+      "cashew"
+    ],
+    "product_code": "23B--03",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Cashew, Shelled."
+  },
+  {
+    "category": "Nuts - Mixed Nut Product",
+    "aliases": [
+      "mixed nuts",
+      "mixed nut product",
+      "nut mix",
+      "assorted nuts",
+      "nuts",
+      "nut",
+      "party nuts",
+      "trail mix nuts"
+    ],
+    "product_code": "23J--01",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Non-Standardized Mixed Nut Product."
+  },
+  {
+    "category": "Nuts - Nuts, In Shell, N.E.C.",
+    "aliases": [
+      "nuts in shell",
+      "in-shell nuts",
+      "whole nuts",
+      "shell nuts",
+      "nuts",
+      "nut",
+      "in shell"
+    ],
+    "product_code": "23A--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Nuts, In Shell, N.E.C."
+  },
+  {
+    "category": "Beverage - Carbonated Citrus Soft Drink",
+    "aliases": [
+      "orange soda",
+      "lemon-lime soda",
+      "citrus soda",
+      "citrus soft drink",
+      "citrus",
+      "orange",
+      "lemon",
+      "lime",
+      "orange drink"
+    ],
+    "product_code": "29B--02",
+    "notes": "Verified in FDA Import Alert 99-39 and Import Alert 45-02; FDA description: Soft Drink, Citrus Fruit Flavored, Carbonated."
+  },
+  {
+    "category": "Beverage - Carbonated Mixed Fruit Soft Drink",
+    "aliases": [
+      "fruit soda",
+      "mixed fruit soda",
+      "fruit-flavored carbonated drink",
+      "fruit soft drink",
+      "fruit punch soda",
+      "fruit drink"
+    ],
+    "product_code": "29B--04",
+    "notes": "Verified in FDA Import Alert 99-39; FDA description: Soft Drink, Mixed Fruit Flavored, Carbonated."
+  },
+  {
+    "category": "Beverage - Carbonated Imitation Fruit Soft Drink",
+    "aliases": [
+      "fruit-flavored soda",
+      "imitation fruit soda",
+      "artificial fruit soda",
+      "fruit soft drink",
+      "imitation fruit",
+      "fruit flavored soda"
+    ],
+    "product_code": "29B--06",
+    "notes": "Verified in FDA Import Alert 45-02; FDA description: Soft Drink, Imitation Fruit Flavored, Carbonated."
+  },
+  {
+    "category": "Beverage - Carbonated Other Fruit Soft Drink",
+    "aliases": [
+      "fruit-flavored carbonated beverage",
+      "other fruit soda",
+      "fruit soda",
+      "fruit",
+      "fruit drink",
+      "fruit beverage"
+    ],
+    "product_code": "29B--09",
+    "notes": "Verified in FDA Import Alert 99-39; FDA description: Soft Drink, Other Fruit Flavored, Carbonated."
+  },
+  {
+    "category": "Beverage - Carbonated Cola",
+    "aliases": [
+      "cola",
+      "cola soda",
+      "carbonated cola",
+      "cola soft drink",
+      "coke",
+      "cola drink"
+    ],
+    "product_code": "29B--50",
+    "notes": "Verified in FDA Import Alert 45-02; FDA description: Soft Drink, Cola, Carbonated."
+  },
+  {
+    "category": "Beverage - Carbonated Soft Drink, N.E.C.",
+    "aliases": [
+      "carbonated soft drink",
+      "soda",
+      "pop",
+      "soft drink",
+      "carbonated beverage",
+      "fizzy drink"
+    ],
+    "product_code": "29B--99",
+    "notes": "Verified in FDA Import Alert 45-02; FDA description: Carbonated Soft Drink, N.E.C."
+  },
+  {
+    "category": "Beverage - Noncarbonated Soft Drink, N.E.C.",
+    "aliases": [
+      "noncarbonated soft drink",
+      "still soft drink",
+      "non-carbonated beverage",
+      "still drink",
+      "juice drink",
+      "beverage"
+    ],
+    "product_code": "29A--99",
+    "notes": "Verified in FDA Import Alert 45-02; FDA description: Noncarbonated Soft Drink, N.E.C."
+  },
+  {
+    "category": "Beverage - Beverage Base, Mixed Fruit",
+    "aliases": [
+      "beverage base",
+      "drink mix",
+      "dry juice mix",
+      "juice booster",
+      "fruit drink base",
+      "powdered drink mix"
+    ],
+    "product_code": "30A--04",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Beverage Base, Mixed Fruit (example: Thermo Booster Dry Juice)."
+  },
+  {
+    "category": "Beverage - Beverage Base Not Mentioned Elsewhere, N.E.C.",
+    "aliases": [
+      "beverage base",
+      "drink base",
+      "beverage concentrate",
+      "beverage mix"
+    ],
+    "product_code": "30Y--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Beverage Base Not Mentioned Elsewhere, N.E.C."
+  },
+  {
+    "category": "Bakery - Bread/Rolls/Buns/Crackers/Sweet Goods",
+    "aliases": [
+      "bread",
+      "rolls",
+      "buns",
+      "crackers",
+      "sweet baked goods",
+      "bakery",
+      "baked goods",
+      "bun",
+      "roll",
+      "cracker"
+    ],
+    "product_code": "03",
+    "notes": "Verified at FDA product-industry level. A full 5-part code should not be inferred from category alone; use the FDA Product Code Builder for product-specific details."
+  },
+  {
+    "category": "Bakery - Bread/Rolls/Buns, N.E.C.",
+    "aliases": [
+      "bread",
+      "rolls",
+      "buns",
+      "toast bread",
+      "steamed buns",
+      "sesame buns",
+      "bun",
+      "roll",
+      "loaf"
+    ],
+    "product_code": "03A--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Bread/Rolls/Buns, N.E.C. (examples: toast bread; steamed sesame buns)."
+  },
+  {
+    "category": "Bakery - Flavored or Party Crackers",
+    "aliases": [
+      "flavored crackers",
+      "party crackers",
+      "potato crackers",
+      "crackers",
+      "cracker",
+      "savory crackers"
+    ],
+    "product_code": "03F--02",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Flavored or Party Crackers (example: Potato Crackers)."
+  },
+  {
+    "category": "Bakery - Plain Cookies, Biscuits and Wafers, N.E.C.",
+    "aliases": [
+      "cookies",
+      "biscuits",
+      "wafers",
+      "toast biscuit",
+      "plain cookies",
+      "cookie",
+      "biscuit",
+      "wafer"
+    ],
+    "product_code": "03H--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Plain Cookies, Biscuits and Wafers, N.E.C. (example: toast biscuit)."
+  },
+  {
+    "category": "Chocolate - Chocolate Candy Bar With Nuts or Nut Products",
+    "aliases": [
+      "chocolate bar with nuts",
+      "nut chocolate bar",
+      "chocolate almond bar",
+      "chocolate pistachio bar",
+      "chocolate",
+      "chocolate bar",
+      "candy bar with nuts"
+    ],
+    "product_code": "34C--01",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Chocolate Candy Bar, with Nuts or Nut Products (not Coconut)."
+  },
+  {
+    "category": "Chocolate - Chocolate Candy Bar Without Nuts and Fruit",
+    "aliases": [
+      "plain chocolate bar",
+      "milk chocolate bar",
+      "dark chocolate bar",
+      "chocolate candy bar",
+      "chocolate",
+      "chocolate bar",
+      "candy bar"
+    ],
+    "product_code": "34F--01",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Chocolate Candy Bar, without Nuts and Fruit."
+  },
+  {
+    "category": "Chocolate - Candy Bar or Pieces (not Caramel or Fondant), Soft, with Nuts",
+    "aliases": [
+      "almond fudge",
+      "soft candy bar with nuts",
+      "candy pieces with nuts",
+      "fudge with nuts",
+      "candy",
+      "nut candy"
+    ],
+    "product_code": "33G--05",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Candy Bar or Pieces (not Caramel or Fondant), Soft, with Nuts (example: Almond Fudge)."
+  },
+  {
+    "category": "Chocolate - Soft Candy with Nuts or Nut Products, N.E.C.",
+    "aliases": [
+      "halawa with pistachios",
+      "soft candy with nuts",
+      "nut candy",
+      "peanut candy",
+      "candy with nuts",
+      "candy"
+    ],
+    "product_code": "33G--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Soft Candy with Nuts or Nut Products, N.E.C. (examples: Nucrem Peanut Candy; Halawa with pistachios)."
+  },
+  {
+    "category": "Chocolate - Soft Candy without Nuts and Fruit, N.E.C.",
+    "aliases": [
+      "halawa",
+      "soft candy",
+      "plain candy",
+      "candy without nuts",
+      "candy"
+    ],
+    "product_code": "33L--99",
+    "notes": "Verified in FDA Import Alert 99-19; FDA description: Soft Candy without Nuts and Fruit, N.E.C. (example: Halawa products)."
+  }
+]

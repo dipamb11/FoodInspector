@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pydantic
+pillow
+ollama
+faster-whisper
+python-multipart
