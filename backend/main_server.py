@@ -256,8 +256,21 @@ def normalize_multi_food_json(raw: str) -> str:
     except (json.JSONDecodeError, TypeError):
         return raw
     if isinstance(parsed, list):
-        return json.dumps({"foods": parsed})
-    return raw
+        parsed = {"foods": parsed}
+
+    # Same root cause: the schema's list fields (ingredients/allergens/nutrition_claims)
+    # aren't Optional, only defaulted when the key is missing — but a model ignoring the
+    # `format` constraint can emit an explicit `null` for "no items" instead of `[]`, which
+    # model_validate_json rejects outright even though the data is otherwise fine.
+    if isinstance(parsed, dict):
+        for food in parsed.get("foods") or []:
+            if not isinstance(food, dict):
+                continue
+            for list_field in ("ingredients", "allergens", "nutrition_claims"):
+                if food.get(list_field) is None:
+                    food[list_field] = []
+
+    return json.dumps(parsed) if isinstance(parsed, dict) else raw
 
 
 # In-memory PoC sessions.
@@ -317,6 +330,29 @@ def preprocess_image_for_ollama(
         "processed_height": processed_height,
         "processed_file_size_bytes": output_path.stat().st_size
     }
+
+
+CLOUD_JPEG_QUALITY = 95
+
+
+def normalize_image_for_cloud(input_path: Path, output_path: Path) -> None:
+    """Cloud vision models are sent the upload at full resolution (see the cloud
+    branch of analyze_session_image), but still need the same HEIC/PNG/RGBA -> JPEG
+    conversion and EXIF-orientation fix that preprocess_image_for_ollama does for the
+    local pipeline — those aren't a CPU/context-size accommodation, they're format
+    compatibility, and Ollama Cloud's vision model can't be assumed to accept whatever
+    format the phone camera captured (notably iPhone Safari's default HEIC)."""
+    with Image.open(input_path) as img:
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
+        img.save(
+            output_path,
+            format="JPEG",
+            quality=CLOUD_JPEG_QUALITY,
+            optimize=True,
+            progressive=True
+        )
+
 
 def run_ocr_pass(image_path: Path) -> str:
     """Stage 1 of the 'ocr_first' pipeline: a cheap, fast transcription of every visible
@@ -1297,6 +1333,7 @@ async def analyze_session_image(
 
     original_path = UPLOAD_DIR / f"{uuid4()}_original"
     processed_path = UPLOAD_DIR / f"{uuid4()}_processed.jpg"
+    cloud_path = UPLOAD_DIR / f"{uuid4()}_cloud.jpg"
 
     try:
         with original_path.open("wb") as buffer:
@@ -1329,14 +1366,17 @@ async def analyze_session_image(
 
         if backend_mode == "cloud":
             # Cloud runs on hosted GPU, not this machine's CPU, so none of the local
-            # resize/recompress reasons apply — send the original upload as-is (whatever
-            # resolution/quality the app captured) instead of the downscaled/JPEG-80
-            # processed_path used for local models, which was losing label detail the
-            # cloud model could otherwise read.
+            # downscale/recompress reasons apply — send the upload at full resolution/
+            # quality instead of the downscaled/JPEG-80 processed_path used for local
+            # models, which was losing label detail the cloud model could otherwise
+            # read. Still normalize format (HEIC/PNG/RGBA -> RGB JPEG, EXIF orientation)
+            # since Ollama Cloud's vision model can't be assumed to accept whatever
+            # format the phone camera captured (e.g. iPhone Safari's default HEIC).
+            await run_in_threadpool(normalize_image_for_cloud, original_path, cloud_path)
             t0 = time.perf_counter()
             raw_content = await run_in_threadpool(
                 cloud_server.analyze_image_cloud,
-                original_path,
+                cloud_path,
                 VISION_DIRECT_INSTRUCTION,
                 MultiFoodAnalysis.model_json_schema(),
             )
@@ -1440,6 +1480,8 @@ async def analyze_session_image(
             original_path.unlink()
         if processed_path.exists():
             processed_path.unlink()
+        if cloud_path.exists():
+            cloud_path.unlink()
 
 
 

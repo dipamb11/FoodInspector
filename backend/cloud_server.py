@@ -22,7 +22,7 @@ from ollama import Client
 
 # Paste your Ollama Cloud API key here, or set the OLLAMA_API_KEY environment
 # variable (which takes precedence if set). https://ollama.com/settings/keys
-OLLAMA_CLOUD_API_KEY = "OLLAMA API KEY"
+OLLAMA_CLOUD_API_KEY = "OLLAMA_API_KEY"
 
 # Any model name from https://ollama.com/search?c=cloud. CLOUD_VISION_MODEL
 # must support image input.

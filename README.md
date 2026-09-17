@@ -3,12 +3,15 @@
 Android app (in-app display name **"Food Inspector"**, package `com.foodinspector.app`) that
 turns Meta Ray-Ban smart glasses, or your phone's own camera, into a hands-free food-label
 scanner, backed by a local FastAPI + Ollama server on your PC (with an optional Ollama Cloud
-fallback).
+fallback). No app install is required either: the same backend also serves a **plain-browser
+UI** (`GET /`) that works from any phone/laptop/tablet on the LAN, camera capture and
+voice-question recording included, once the server is running over HTTPS (see
+[Browser access setup](#browser-access-setup-https--mkcert) below).
 
-Point the glasses (or your phone) at a food label, say "take a picture," and get back a
-structured breakdown of every product in frame, ingredients, allergens, nutrition claims, and
-a best-effort FDA product-code match, then keep asking follow-up questions by voice, entirely
-hands-free.
+Point the glasses (or your phone, or any browser) at a food label, say "take a picture" (or tap
+capture), and get back a structured breakdown of every product in frame, ingredients, allergens,
+nutrition claims, and a best-effort FDA product-code match, then keep asking follow-up questions
+by voice, entirely hands-free on the app/glasses path, or by recording a question in the browser.
 
 ## Architecture
 
@@ -20,6 +23,10 @@ flowchart TB
 
     subgraph PhoneCam["Phone's own camera"]
         SystemCamera["System Camera app"]
+    end
+
+    subgraph BrowserClient["Any browser, phone/laptop/tablet on the LAN, no app install"]
+        BrowserUI["GET / unified page<br/>file input (capture=environment) for photos,<br/>getUserMedia+MediaRecorder for voice questions"]
     end
 
     subgraph App["Android App, Food Inspector (com.foodinspector.app)"]
@@ -58,7 +65,8 @@ flowchart TB
     ViewModel --> EvidenceSaver
     EvidenceSaver --> SavedEvidence
 
-    BackendClient -- "HTTP (same LAN)" --> MainServer
+    BackendClient -- "HTTP(S) (same LAN)" --> MainServer
+    BrowserUI -- "HTTPS (mkcert-issued cert)<br/>required for camera/mic on a non-localhost origin" --> MainServer
     MainServer -- "backend_mode=local" --> LocalOllama
     MainServer -- "backend_mode=cloud" --> CloudServer
     MainServer --> FdaMatcher
@@ -107,6 +115,49 @@ sequenceDiagram
     VM-->>U: shown in Voice tab + spoken via TTS
 ```
 
+### Browser client, end to end (no app install)
+
+The same backend serves a self-contained HTML/JS page at `GET /` that any browser on the LAN can
+open directly, useful for quick testing or devices you don't want to install the Android app on.
+It talks to the exact same `/session/*` endpoints as the Android app, so it goes through the
+identical vision/FDA/voice pipeline server-side.
+
+```mermaid
+sequenceDiagram
+    participant U as User (browser)
+    participant PG as / page (JS)
+    participant BE as main_server.py
+    participant O as Ollama (local or cloud)
+
+    U->>PG: open https://<PC-LAN-IP>:8443/
+    PG->>BE: (page load) creates a session server-side, embeds session_id
+    U->>PG: choose/take photo (input[type=file] capture="environment")
+    PG->>BE: POST /session/{id}/image (multipart, same field names as the app)
+    BE->>O: vision_direct or ocr_first pipeline (identical to app path)
+    O-->>BE: raw JSON
+    BE-->>PG: analysis JSON
+    PG-->>U: renders JSON in the Analysis card
+
+    U->>PG: tap "Start Recording"
+    PG->>PG: navigator.mediaDevices.getUserMedia({audio:true})<br/>requires a secure context (HTTPS or localhost)
+    PG->>PG: MediaRecorder captures audio/webm|mp4 until "Stop Recording"
+    PG->>BE: POST /session/{id}/voice (multipart audio blob)
+    BE->>BE: faster-whisper transcribes audio -> text
+    BE->>O: run_llm_chat() over session["messages"]
+    O-->>BE: plain-text answer
+    BE-->>PG: {transcription, response}
+    PG-->>U: both appended to the chat log
+```
+
+Two browser-specific constraints drive the setup steps below:
+- **Camera** (`capture="environment"`) works over plain HTTP on the LAN.
+- **Microphone** (`getUserMedia`) is only granted by browsers in a *secure context*: `https://`,
+  or `http://localhost`. Since the phone/laptop is a different device than the PC running the
+  server, `localhost` doesn't apply, so voice questions from a browser require the server to be
+  served over HTTPS with a certificate the browser actually trusts (a self-signed cert typically
+  triggers a "not private" warning page that browsers block `getUserMedia` behind, or refuse
+  entirely) — see [Browser access setup](#browser-access-setup-https--mkcert).
+
 ## What this app does
 
 1. **Connect** to Meta Ray-Ban glasses over the Device Access Toolkit (DAT) SDK, or skip the
@@ -122,8 +173,21 @@ sequenceDiagram
    lands in your phone's visible Downloads folder.
 5. Switch between **local** (your PC's Ollama, CPU) and **Ollama Cloud** (hosted models) with
    one toggle, per request.
+6. Skip the app entirely and use **any browser** on the LAN (phone, laptop, tablet) against the
+   same backend's built-in `/` page, camera capture and voice-question recording both work once
+   the server is set up with HTTPS (see [Browser access setup](#browser-access-setup-https--mkcert)).
 
 ## Features in detail
+
+### Browser access (no app install)
+`GET /` (see `unified_page()` in `main_server.py`) serves a self-contained HTML/JS page: an
+`input[type=file] capture="environment"` for taking/choosing a photo, a **Start/Stop Recording**
+button backed by `getUserMedia` + `MediaRecorder` for voice questions, a chat log, and the same
+local/cloud toggle as the app. It calls the exact same `/session/{id}/image`, `/session/{id}
+/voice`, and `/session/{id}/ask`-shaped endpoints as the Android app, so every backend behavior
+(pipeline mode, FDA matching, cloud fallback) is identical; only the client is different. Photo
+capture works over plain HTTP on the LAN; the microphone requires HTTPS (browsers only grant
+`getUserMedia` in a secure context), which is why this path needs the certificate setup below.
 
 ### Glasses connection (DAT SDK 0.9.0)
 `GlassesManager.kt` wraps the Meta DAT session/camera API:
@@ -144,9 +208,12 @@ just a different source label.
 A single `cloudMode` flag (Settings screen) is sent as `backend_mode` on every image/ask
 request. Local mode runs a CPU-bound Ollama instance on your PC (see Pipeline modes below);
 Cloud mode calls **Ollama Cloud** via `cloud_server.py` using an API key you configure. Cloud
-uses the **original, uncompressed** upload (no resize/recompress, that's a CPU-latency
+sends the upload at **full resolution/quality** (no resize/recompress, that's a CPU-latency
 mitigation that doesn't apply to a hosted GPU) while local mode uses the resized/recompressed
-JPEG.
+JPEG; both paths still run the upload through the same HEIC/PNG/RGBA -> RGB JPEG conversion and
+EXIF-orientation fix (`preprocess_image_for_ollama()` locally, `normalize_image_for_cloud()` for
+cloud), that's format compatibility, not a resolution tradeoff, so a phone/browser upload in an
+unusual format (e.g. iPhone Safari's default HEIC) works on either backend.
 
 ### Hands-free voice mode
 `GlassesVoiceManager.kt` uses Android's on-device `SpeechRecognizer` (not a manual
@@ -221,9 +288,12 @@ currently just sets a status message, no network call.
 All three paths converge on the same `MultiFoodAnalysis` pydantic schema, and all raw model
 output is passed through `extract_json_payload()` -> `strip_json_code_fence()` ->
 `normalize_multi_food_json()` before validation, cloud models in particular have been observed
-wrapping JSON in markdown fences, adding prose around it, or returning a bare array instead of
-the required `{"foods": [...]}` object; these three helpers recover all of those cases without
-rejecting an otherwise-usable response.
+wrapping JSON in markdown fences, adding prose around it, returning a bare array instead of the
+required `{"foods": [...]}` object, or emitting an explicit `null` for a list field
+(`ingredients`/`allergens`/`nutrition_claims`) instead of `[]` for "no items" (the schema's
+`format` constraint asks for an array, but a model that ignores it can still emit `null`, which
+`model_validate_json` rejects outright even though the rest of the item is fine); these helpers
+recover all of those cases without rejecting an otherwise-usable response.
 
 ### CPU-latency mitigations
 This machine has no GPU, so every local Ollama call is CPU-bound. `OLLAMA_KEEP_ALIVE = "30m"`
@@ -241,7 +311,7 @@ caps context size instead of relying on a vision model's often-huge default.
 | `POST /session/{id}/voice` | Audio-upload question (multipart `audio` + `backend_mode`), server-side Whisper transcription; used by the browser UI and the `/glasses/voice` bridge |
 | `GET /session/{id}/glasses/status`, `POST /session/{id}/glasses/command` | Lightweight bridge endpoints for a native companion app |
 | `GET /health`, `GET /debug` | Machine-readable health check / human-readable diagnostics page |
-| `GET /` | Minimal browser UI (upload an image, record voice), includes the same cloud/local toggle |
+| `GET /` | Full browser UI (capture/upload an image, record a voice question), includes the same cloud/local toggle; microphone recording needs HTTPS, see [Browser access setup](#browser-access-setup-https--mkcert) |
 
 ### Models
 - Local vision: `ministral-3:3b`. Local text: `minicpm-v4.6:1b`. Local OCR (`ocr_first` only):
@@ -325,6 +395,12 @@ colors.
   unless asked).
 - `strip_json_code_fence()` / `extract_json_payload()` / `normalize_multi_food_json()`, the
   three-stage cleanup applied to every raw model response before schema validation.
+- `preprocess_image_for_ollama()` / `normalize_image_for_cloud()`, HEIC/PNG/RGBA -> RGB JPEG +
+  EXIF-orientation fix for the local (resized/recompressed) and cloud (full-resolution) paths
+  respectively.
+- `unified_page()`, the `GET /` handler: creates a session and returns the self-contained
+  browser HTML/JS client (file-input photo capture, `getUserMedia`/`MediaRecorder` voice
+  recording, chat log).
 - `_warm_up_ollama_models()`, startup model pre-warming.
 
 **`cloud_server.py`**, `analyze_image_cloud()`, `run_llm_chat_cloud()`,
@@ -363,6 +439,63 @@ colors.
    ```
 6. Verify: `http://127.0.0.1:8443/debug` (PC) and `http://<PC-LAN-IP>:8443/debug` (phone browser,
    same LAN, Windows Firewall must allow the port).
+
+### Browser access setup (HTTPS / mkcert)
+The `/` browser client's **camera input works fine over plain HTTP**, but its **microphone
+recording does not**: `getUserMedia` is only granted by browsers in a secure context
+(`https://`, or `http://localhost`), and a phone/laptop hitting the PC's LAN IP is neither. A
+plain self-signed cert doesn't fix this either, since browsers still flag it "not private" and
+either block `getUserMedia` behind that warning or refuse it outright. The fix is to run the
+server over HTTPS with a certificate issued by a **locally-trusted CA**, which is what
+[mkcert](https://github.com/FiloSottile/mkcert) is for: it makes a CA, installs it into your PC
+and phone's trust stores, and issues certs from it, no real domain or public CA involved.
+
+1. **Install mkcert on the PC** (Windows):
+   ```powershell
+   choco install mkcert
+   # or: scoop bucket add extras && scoop install mkcert
+   ```
+2. **Create and install the local CA** (one-time; this is what makes the cert trusted instead of
+   just self-signed):
+   ```powershell
+   mkcert -install
+   ```
+   This drops a root CA into Windows' trust store and, if present, Firefox's.
+3. **Find your PC's LAN IP** (also shown on the `/debug` page):
+   ```powershell
+   ipconfig
+   ```
+4. **Issue a certificate for that IP** (and `localhost`, for testing directly on the PC), from
+   `backend/`:
+   ```powershell
+   mkcert -key-file key.pem -cert-file cert.pem localhost 127.0.0.1 <PC-LAN-IP>
+   ```
+   Re-run this (with `-install` first, if needed) whenever the PC's LAN IP changes (e.g. a new
+   DHCP lease); a cert is only valid for the exact hostnames/IPs it was issued for. `key.pem`/
+   `cert.pem` are local secrets (private key + cert), not for source control, add them to
+   `.gitignore` if they aren't already covered by an existing ignore rule.
+5. **Run uvicorn with TLS**, pointing at the generated files:
+   ```powershell
+   python -m uvicorn main_server:app --host 0.0.0.0 --port 8443 --ssl-keyfile key.pem --ssl-certfile cert.pem
+   ```
+6. **Trust the CA on your phone**, so it's not just the PC that trusts these certs:
+   - Get the CA cert file: `mkcert -CAROOT` prints the folder containing `rootCA.pem`; email/
+     AirDrop/transfer that single file to the phone (not `key.pem`/`cert.pem`, those are
+     per-device certs, not the CA).
+   - **Android**: Settings -> Security -> Encryption & credentials -> Install a certificate ->
+     CA certificate -> pick `rootCA.pem` (exact menu path varies by OEM/Android version).
+   - **iOS**: AirDrop or email `rootCA.pem` to the phone, open it (Settings prompts to install
+     the profile), then **Settings -> General -> About -> Certificate Trust Settings** and
+     enable full trust for the new root, iOS installs profiles as untrusted for TLS by default
+     even after "Install".
+7. **Verify from the phone's browser**: `https://<PC-LAN-IP>:8443/` should load with no
+   certificate warning, and tapping **Start Recording** should prompt for microphone permission
+   instead of silently failing.
+
+If you'd rather not manage a CA at all, a reverse tunnel (e.g. `ngrok http 8443` or Cloudflare
+Tunnel) also gives you a real publicly-trusted HTTPS URL with no cert setup on the phone, at the
+cost of routing traffic through a third-party service, not recommended if the photos/voice
+questions are sensitive.
 
 ### Android app
 1. Open the project root in Android Studio, let it sync.
@@ -412,6 +545,19 @@ follow an SCO route). Both are already handled in `GlassesVoiceManager`; see `SO
 if this regresses.
 
 **Cloud mode returns a 502 / malformed JSON**, some cloud models don't reliably obey the JSON
-schema constraint (wrap it in markdown, add prose, or return a bare array). `main_server.py`
-already recovers all three cases; if a new failure mode shows up, the full raw response is
-logged server-side (never sent to the client) for diagnosis.
+schema constraint (wrap it in markdown, add prose, return a bare array, or emit `null` instead
+of `[]` for an empty list field). `main_server.py` already recovers all of these cases; if a new
+failure mode shows up, the full raw response is logged server-side (never sent to the client)
+for diagnosis.
+
+**Browser "Start Recording" fails silently or the mic permission prompt never appears**, the
+page is not in a secure context. `https://<ip>` with a browser-trusted cert (mkcert, see
+[Browser access setup](#browser-access-setup-https--mkcert)) is required for any origin other
+than `localhost`; a plain self-signed cert or plain `http://<ip>` both fail this check, even
+though the photo-capture half of the page works fine either way, camera capture (a file picker)
+isn't gated by the same secure-context rule.
+
+**Browser shows a certificate warning even after `mkcert -install`**, the CA was installed into
+the PC's trust store, not the phone's, each device needs the CA installed separately (step 6 of
+the browser setup); also re-issue the cert if the PC's LAN IP has changed since it was created,
+since a cert is only valid for the exact hostnames/IPs passed to `mkcert` when it was issued.

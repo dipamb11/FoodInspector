@@ -393,3 +393,51 @@ package move is exactly the kind of change a Kotlin-only compile can silently pa
 
 Not touched: `.idea/workspace.xml` (IDE-generated editor/run-config state, Android Studio
 regenerates this on its own when the project is reopened; hand-editing it isn't meaningful).
+
+## 2026-09-17: cloud image format normalization, null-list JSON fix, browser HTTPS documentation
+
+**Cloud-path HEIC/PNG/RGBA normalization (`main_server.py`, new `normalize_image_for_cloud()`).**
+Cloud mode was uploading `original_path` (the raw upload) as-is to `cloud_server
+.analyze_image_cloud()`, on the reasoning that cloud runs on a hosted GPU so none of the local
+downscale/recompress CPU-latency mitigations apply. That's true for resolution/compression, but
+conflated with a separate concern: format compatibility. An iPhone Safari upload (or a browser
+client generally) can be HEIC, a screenshot can be RGBA PNG, and EXIF orientation can leave a
+photo sideways, none of that is a CPU accommodation, it's just what a phone camera produces, and
+there's no reason to assume Ollama Cloud's hosted vision model accepts an arbitrary input format.
+Fixed by adding `normalize_image_for_cloud()`, the same HEIC/PNG/RGBA -> RGB JPEG conversion and
+`ImageOps.exif_transpose()` fix `preprocess_image_for_ollama()` already does for the local path,
+but saved at a high JPEG quality (95, vs. local's lower CPU-motivated quality) rather than
+resized, so cloud still gets full-resolution label detail. `analyze_session_image()`'s cloud
+branch now writes to a third temp path (`cloud_path`, alongside the existing `original_path`/
+`processed_path`), cleaned up in the same `finally` block as the other two.
+
+**`normalize_multi_food_json()`: null list fields (`main_server.py`).** A cloud model
+(`format` schema constraint notwithstanding) was observed emitting an explicit `null` for
+`ingredients`/`allergens`/`nutrition_claims` instead of `[]` when a product had none, which
+`MultiFoodAnalysis.model_validate_json()` rejected outright (those fields are typed as lists,
+defaulted only when the key is *missing*, not when it's present-but-null), even though the rest
+of the item's data was fine. Same root cause as the earlier bare-array/markdown-fence/prose bugs
+this function already recovers from: a cloud model treating the JSON schema as a suggestion, not
+a hard constraint. Fixed by walking `parsed["foods"]` after array/object normalization and
+coercing any `None` in those three fields to `[]` before re-serializing for
+`model_validate_json()`.
+
+**Browser HTTPS / mkcert documentation (`README.md`).** The `/` browser client (`unified_page()`)
+already existed (file-input photo capture, `getUserMedia`/`MediaRecorder` voice recording) but
+wasn't documented as a first-class access path, and its secure-context requirement wasn't
+written down anywhere: `getUserMedia` is only granted by browsers on `https://` or
+`http://localhost`, and a phone/laptop hitting the PC over its LAN IP is neither, so voice
+questions from any device other than the PC itself silently failed (or never prompted for mic
+permission) over the plain `http://<PC-LAN-IP>:8443` setup the rest of this README documented.
+Photo capture (a `file` input) isn't gated by this rule and was already working. Documented the
+fix, running the server over HTTPS with a certificate from a **locally-trusted CA** via
+[mkcert](https://github.com/FiloSottile/mkcert): `mkcert -install` once on the PC, issue a cert
+for `localhost`/`127.0.0.1`/the PC's LAN IP, run `uvicorn` with `--ssl-keyfile`/`--ssl-certfile`,
+then install mkcert's root CA (`rootCA.pem`, from `mkcert -CAROOT`, not the per-device cert) into
+each phone's trust store separately, since a CA installed on the PC only makes the PC trust
+certs issued from it. No code change was needed for this, `uvicorn` already accepts TLS
+cert/key flags natively; this was purely a documentation gap. Updated `README.md`'s architecture
+diagram (added a `BrowserClient` node), added a browser-specific sequence diagram, a "Browser
+access" features section, and a "Browser access setup (HTTPS / mkcert)" setup section with the
+step-by-step cert creation/install flow, plus two Troubleshooting entries for the most likely
+failure modes (secure-context failure, CA installed on the wrong device / stale IP).
