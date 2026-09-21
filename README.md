@@ -229,7 +229,16 @@ before falling through to "ask the LLM a question":
 | "save it", "save", "store", "copy", "keep evidence" | Save photo + analysis + conversation locally |
 | "stop voice mode", "stop voice", "turn off voice mode", "turn off voice", "pause voice" | Turn voice mode off |
 | "stop glasses", "turn off glasses", "turn off glass", "disconnect glasses", "disconnect", "pause video", "pause image" | Disconnect glasses (voice mode keeps listening) |
+| "start glasses", "turn on glasses", "turn on glass", "connect glasses", "connect", "start video", "start image", "start streaming" | (Re)connect glasses + start streaming (voice mode keeps listening) |
 | *(anything else)* | Sent to the backend as a question (`/session/{id}/ask`) |
+
+The connect list is checked **after** the disconnect list, since "disconnect" contains "connect"
+as a substring — checking disconnect first is what keeps a spoken "disconnect" from also
+matching the connect trigger. Connecting by voice reuses the same permission-request callback
+the manual **Connect** button uses (cached from `initializeGlasses()`/a prior manual Connect, so
+the DAT permission prompt can still be requested without an Activity reference on hand); if
+nothing has ever registered that callback yet (should not happen in practice, since it's wired up
+at app startup), the command speaks a short fallback message instead of silently doing nothing.
 
 LLM answers are run through `stripMarkdown()` before being shown or spoken, since local models
 sometimes wrap words in `**bold**`/`` `code` `` even when the system prompt says not to, this
@@ -356,7 +365,12 @@ Prefer setting the `OLLAMA_API_KEY` environment variable (checked first) over ed
 - `toggleVoiceMode()` / `startVoiceMode()` / `stopVoiceMode()`, hands-free loop on/off.
 - `listenOnce()` / `handleVoiceCommand(transcript)` / `speakThenListen(text)`, the continuous
   listen -> route -> act -> speak -> listen loop; `handleVoiceCommand` is where every trigger
-  phrase list (capture/save/stop-voice/stop-glasses) is checked in order.
+  phrase list (capture/save/stop-voice/stop-glasses/**connect-glasses**) is checked in order.
+- `connectGlasses(request)` / `performConnectGlasses(request)`, shared by the manual **Connect**
+  button and the "connect glasses" voice command: requests DAT camera permission if needed, then
+  starts the stream. The permission-request callback is cached in `permissionRequester` (set from
+  `initializeGlasses()`/`connectGlasses()`) so the voice path can reuse it without an Activity
+  reference of its own.
 - `performSave()` / `saveEvidence()` / `handleSaveCommand()`, shared save logic plus its
   voice (speaks result) and menu-tap (silent) entry points.
 - `updateBackendUrl(url)`, validates and applies a new backend URL, resetting session state.
@@ -561,3 +575,18 @@ isn't gated by the same secure-context rule.
 the PC's trust store, not the phone's, each device needs the CA installed separately (step 6 of
 the browser setup); also re-issue the cert if the PC's LAN IP has changed since it was created,
 since a cert is only valid for the exact hostnames/IPs passed to `mkcert` when it was issued.
+
+**Phone/glasses show "failed to connect" to the backend after changing networks or the backend
+URL**, two independent things to check, in order: (1) the backend URL entered in **☰ ->
+Settings** is the exact current LAN IP of the PC (`ipconfig` on the PC, or the `/debug` page) —
+a stale/typo'd IP is the most common cause and looks identical to a real connectivity failure
+from the app's error message alone; (2) Windows Firewall. There's no default inbound rule for
+the backend's port (8443), and Windows classifies a new/unfamiliar WiFi as a **Public** network
+by default, which blocks unsolicited inbound connections even from another device on the same
+WiFi. Add an inbound rule once (elevated PowerShell):
+```powershell
+New-NetFirewallRule -DisplayName "FoodInspector Backend (8443)" -Direction Inbound -Protocol TCP -LocalPort 8443 -Action Allow -Profile Any
+```
+Verify with `http://<PC-LAN-IP>:8443/debug` from the phone's browser before assuming it's an
+app-side bug — if that doesn't load, nothing in the app can either, regardless of which capture
+source (glasses/phone camera/browser) is used, since they all hit the same backend URL.

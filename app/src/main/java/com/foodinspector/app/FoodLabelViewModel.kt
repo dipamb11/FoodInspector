@@ -64,6 +64,22 @@ private val STOP_GLASSES_TRIGGERS = listOf(
     "pause image",
 )
 
+/** Spoken phrases that (re)connect the glasses and start streaming — the counterpart to
+ *  STOP_GLASSES_TRIGGERS, so a spoken "disconnect" can be followed by a spoken way back in
+ *  without touching the phone. Checked AFTER isStopGlassesCommand in handleVoiceCommand: since
+ *  "disconnect" contains "connect" as a substring, checking stop first is what keeps a spoken
+ *  "disconnect" from also matching this list. */
+private val CONNECT_GLASSES_TRIGGERS = listOf(
+    "start glasses",
+    "turn on glasses",
+    "turn on glass",
+    "connect glasses",
+    "connect",
+    "start video",
+    "start image",
+    "start streaming",
+)
+
 data class ConversationTurn(val question: String, val answer: String)
 
 /** Strips common inline Markdown emphasis (**bold**, *italic*, _underscore_, `code`) and
@@ -128,7 +144,13 @@ class FoodLabelViewModel(application: Application) : AndroidViewModel(applicatio
     private var voiceModeOn = false
     private var glassesInitialized = false
 
-    fun initializeGlasses() {
+    /** Cached from initializeGlasses()/connectGlasses() so the "connect glasses" voice command
+     *  can (re)request permission and reconnect without needing an Activity reference of its
+     *  own — handleVoiceCommand only ever runs after MainActivity has already wired one up. */
+    private var permissionRequester: (suspend (Permission) -> PermissionStatus)? = null
+
+    fun initializeGlasses(requestPermission: suspend (Permission) -> PermissionStatus) {
+        permissionRequester = requestPermission
         if (glassesInitialized) return
         glassesInitialized = true
 
@@ -143,17 +165,26 @@ class FoodLabelViewModel(application: Application) : AndroidViewModel(applicatio
     fun register(activity: Activity) = glasses.register(activity)
 
     fun connectGlasses(request: suspend (Permission) -> PermissionStatus) {
-        viewModelScope.launch {
-            _ui.update { it.copy(busy = true, error = null, status = "Checking glasses permission...") }
-            try {
-                if (glasses.ensureCameraPermission(request)) {
-                    glasses.startStream()
-                } else {
-                    _ui.update { it.copy(error = "Glasses camera permission denied") }
-                }
-            } finally {
-                _ui.update { it.copy(busy = false) }
+        permissionRequester = request
+        viewModelScope.launch { performConnectGlasses(request) }
+    }
+
+    /** Shared by the manual Connect button (connectGlasses()) and the "connect glasses" voice
+     *  command in handleVoiceCommand: requests camera permission if needed, then starts the DAT
+     *  stream. Returns whether it actually connected so each caller can give its own feedback
+     *  (UI-only vs. a spoken confirmation). */
+    private suspend fun performConnectGlasses(request: suspend (Permission) -> PermissionStatus): Boolean {
+        _ui.update { it.copy(busy = true, error = null, status = "Checking glasses permission...") }
+        return try {
+            if (glasses.ensureCameraPermission(request)) {
+                glasses.startStream()
+                true
+            } else {
+                _ui.update { it.copy(error = "Glasses camera permission denied") }
+                false
             }
+        } finally {
+            _ui.update { it.copy(busy = false) }
         }
     }
 
@@ -354,7 +385,8 @@ class FoodLabelViewModel(application: Application) : AndroidViewModel(applicatio
         val isSaveCommand = SAVE_VOICE_TRIGGERS.any { transcript.contains(it, ignoreCase = true) }
         val isStopVoiceCommand = STOP_VOICE_TRIGGERS.any { transcript.contains(it, ignoreCase = true) }
         val isStopGlassesCommand = STOP_GLASSES_TRIGGERS.any { transcript.contains(it, ignoreCase = true) }
-        Log.d(TAG, "handleVoiceCommand: transcript=\"$transcript\" isCaptureCommand=$isCaptureCommand isSaveCommand=$isSaveCommand isStopVoiceCommand=$isStopVoiceCommand isStopGlassesCommand=$isStopGlassesCommand")
+        val isConnectGlassesCommand = CONNECT_GLASSES_TRIGGERS.any { transcript.contains(it, ignoreCase = true) }
+        Log.d(TAG, "handleVoiceCommand: transcript=\"$transcript\" isCaptureCommand=$isCaptureCommand isSaveCommand=$isSaveCommand isStopVoiceCommand=$isStopVoiceCommand isStopGlassesCommand=$isStopGlassesCommand isConnectGlassesCommand=$isConnectGlassesCommand")
 
         if (isCaptureCommand) {
             _ui.update { it.copy(lastQuestion = transcript) }
@@ -382,6 +414,19 @@ class FoodLabelViewModel(application: Application) : AndroidViewModel(applicatio
             Log.d(TAG, "handleVoiceCommand: disconnecting glasses by voice command")
             disconnectGlasses()
             if (voiceModeOn) speakThenListen("Glasses disconnected.")
+            return
+        }
+
+        if (isConnectGlassesCommand) {
+            val request = permissionRequester
+            if (request == null) {
+                Log.w(TAG, "handleVoiceCommand: connect-glasses command but no permission requester registered yet")
+                if (voiceModeOn) speakThenListen("Glasses aren't set up yet. Please connect from the app first.")
+                return
+            }
+            Log.d(TAG, "handleVoiceCommand: connecting glasses by voice command")
+            val connected = performConnectGlasses(request)
+            if (voiceModeOn) speakThenListen(if (connected) "Glasses connected." else "Couldn't connect to the glasses.")
             return
         }
 

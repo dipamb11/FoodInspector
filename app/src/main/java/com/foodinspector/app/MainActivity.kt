@@ -177,7 +177,7 @@ class MainActivity : ComponentActivity() {
             )
         )
 
-        vm.initializeGlasses()
+        vm.initializeGlasses(::requestWearablesPermission)
 
         setContent {
             FoodInspectorTheme {

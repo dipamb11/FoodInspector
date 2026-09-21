@@ -441,3 +441,45 @@ diagram (added a `BrowserClient` node), added a browser-specific sequence diagra
 access" features section, and a "Browser access setup (HTTPS / mkcert)" setup section with the
 step-by-step cert creation/install flow, plus two Troubleshooting entries for the most likely
 failure modes (secure-context failure, CA installed on the wrong device / stale IP).
+
+## 2026-09-21: "failed to connect" after a backend-URL change, and a "connect glasses" voice command
+
+**Diagnosed, not a code bug: backend "failed to connect" after switching networks.** User
+reported the glasses capture failing right after updating the backend URL in Settings for a new
+network/IP. Traced `updateBackendUrl()` (`FoodLabelViewModel.kt`), `BackendClient` construction,
+and both capture paths (glasses and phone camera share `uploadAndAnalyze()`) — all correctly use
+the live `AppUiState.backendUrl` per-request, no stale/cached client, no cleartext-traffic
+restriction (`AndroidManifest.xml` sets `usesCleartextTraffic="true"` globally, no
+`network_security_config.xml` restricting it), so the app-side URL-update path was never at
+fault. Checked the PC side instead: `Get-NetFirewallRule` showed **no inbound rule for port
+8443 at all**, and `Get-NetConnectionProfile` showed the current WiFi classified **Public**,
+which blocks unsolicited inbound connections by default regardless of same-LAN reachability.
+Documented the fix (an inbound `New-NetFirewallRule` for TCP 8443) in `README.md`'s
+Troubleshooting section. **Actual root cause turned out to be simpler**: user confirmed
+afterward they'd entered the wrong IP in Settings, not a firewall issue — the firewall gap is
+real and now fixed/documented regardless, since it would have caused the identical symptom on
+the very next real network change.
+
+**"Connect glasses" voice command (`FoodLabelViewModel.kt`, `MainActivity.kt`).** Requested as
+the counterpart to the existing `STOP_GLASSES_TRIGGERS`/disconnect-by-voice command: phrases like
+"start glasses", "connect", "start streaming" should (re)connect the glasses and start streaming,
+same as tapping the manual **Connect** button, without leaving voice mode (mirroring how
+disconnect-by-voice already works). The manual Connect button's `connectGlasses(request)`
+required a `suspend (Permission) -> PermissionStatus` callback supplied by `MainActivity`
+(`::requestWearablesPermission`, backed by the DAT `Wearables.RequestPermissionContract()`
+launcher), which `handleVoiceCommand` has no way to obtain on its own, it runs entirely inside
+the ViewModel with no Activity reference. Fixed by caching that callback in a new
+`permissionRequester` field, set both from `initializeGlasses(requestPermission)` (now takes the
+callback as a parameter, set at app startup) and from `connectGlasses(request)` (the manual
+button path, kept for redundancy), and factoring the actual connect logic out of `connectGlasses`
+into a new suspend `performConnectGlasses(request): Boolean` that both the button (via
+`viewModelScope.launch`) and `handleVoiceCommand` (awaited directly, so it can speak a
+connected/failed confirmation) call.
+
+Added `CONNECT_GLASSES_TRIGGERS` (`"start glasses"`, `"turn on glasses"`, `"turn on glass"`,
+`"connect glasses"`, `"connect"`, `"start video"`, `"start image"`, `"start streaming"`) and
+checked it in `handleVoiceCommand` **after** `isStopGlassesCommand`, deliberately: `"disconnect"`
+contains `"connect"` as a literal substring, so if the connect check ran first (or independently
+of the disconnect check), a spoken "disconnect" would incorrectly also match the connect trigger
+list. Checking disconnect first and returning early (already the existing control flow) avoids
+this without needing any word-boundary regex.
