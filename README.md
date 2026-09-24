@@ -281,6 +281,18 @@ a time.
 "Send to SERIO" is a **placeholder** for a future REST integration with an external app,
 currently just sets a status message, no network call.
 
+### Food tab: table vs. raw JSON view
+The **Food** card defaults to a human-readable **table** (`FoodAnalysisTable` in
+`MainActivity.kt`): one product-labeled table per detected food, each a 2-column field/value
+grid built from the known `LabelAnalysis`/`FdaMatch` schema (product name, brand, ingredients,
+allergens, nutrition claims, FDA match, etc., in a fixed hand-picked order/labeling rather than a
+generic JSON dump), with list fields joined into a comma-separated string and missing/null values
+shown as an em dash. Tapping the **{}** button in the card header (a `FilledTonalIconButton`, so
+it reads as a real button rather than a bare icon, solid-filled while active) toggles to the
+original raw, pretty-printed JSON view (and back). Both views read from the same
+`AppUiState.analysisJson` string, the table is just parsed from it client-side with `org.json`,
+no extra backend call or state.
+
 ## Backend (`backend/`)
 
 ### Pipeline modes (`main_server.py`, `PIPELINE_MODE` constant)

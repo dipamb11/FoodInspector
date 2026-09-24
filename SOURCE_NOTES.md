@@ -483,3 +483,39 @@ contains `"connect"` as a literal substring, so if the connect check ran first (
 of the disconnect check), a spoken "disconnect" would incorrectly also match the connect trigger
 list. Checking disconnect first and returning early (already the existing control flow) avoids
 this without needing any word-boundary regex.
+
+## 2026-09-23: Food tab table view (`MainActivity.kt`)
+
+Requested: the Food card's raw pretty-printed JSON was hard to scan, replace it with a default
+human-readable table (2 columns: field name, value) and move the raw JSON behind a `{}` icon
+toggle. Implemented client-side only (`FoodAnalysisTable`, `AnalysisRowsTable`,
+`buildAnalysisRows`, `parseFoodsFromAnalysisJson`, `displayValue` in `MainActivity.kt`), no
+backend or `AppUiState` change: `state.analysisJson` (already the backend's pretty-printed
+`{"foods": [...]}` string) is parsed locally with `org.json` and rendered per-product.
+
+Deliberately used a **fixed, hand-picked field list/order** (product name, brand, lot number,
+expiration date, manufacturer, ingredients, allergens, nutrition claims, visible text, then the
+`fda_match` sub-fields flattened into 4 rows) matching `LabelAnalysis`/`FdaMatch`
+(`main_server.py`/`fda_matcher.py`) instead of a generic recursive JSON-to-rows flatten. A
+generic flatten would produce raw key names (`fda_match.selected_match`) as row labels and
+arbitrary ordering; the fixed list gives proper labels ("FDA Match", "FDA Match Confidence") and
+a stable, predictable row order, at the cost of needing a one-line update here if the backend
+schema ever gains/renames a field (acceptable since this list already mirrors the schema
+1:1, no separate source of truth to drift from). List fields (ingredients/allergens/nutrition
+claims/other FDA matches) are joined into one comma-separated display string per row rather than
+one row per item, per "the table has 2 columns, one row per data field."
+
+The toggle is local `remember { mutableStateOf(false) }` state inside the Food card's composable,
+not `AppUiState`, since it's a pure view preference with no bearing on app/session state and
+resets naturally (table view) each time the Food card is recomposed fresh — matching how no
+other per-tab UI toggle in this app persists across a session either.
+
+**Follow-up polish (same day).** Two things reported after trying it live: (1) the card heading
+"Latest Food Label Analysis" was trimmed to "Food Label Analysis" ("Latest" was redundant, this
+card only ever shows the latest analysis, there's no history view to distinguish it from); (2)
+the `{}` toggle used a plain `IconButton`, which on a bare icon (no background) doesn't read as
+tappable to a first-time user, the surrounding UI's other icon-affordances (bottom nav, Save/⋮
+menu) all use a colored/filled background specifically so they're recognizable as buttons.
+Switched to a Material3 `FilledTonalIconButton` (tonal background = inactive/table view, solid
+`filledIconButtonColors()` = active/JSON view), consistent with Material3's own guidance that a
+tonal/filled container, not tint-only, is what signals "this is a button" at a glance.

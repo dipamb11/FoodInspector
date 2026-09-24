@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
@@ -43,8 +44,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -90,6 +93,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import kotlin.coroutines.resume
 
@@ -573,15 +578,36 @@ private fun MainScreenContent(
             }
 
             if (selectedTab == BottomTab.FOOD && state.analysisJson != null) {
+                var showRawJson by remember { mutableStateOf(false) }
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Latest Food Label Analysis", style = MaterialTheme.typography.titleLarge)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Food Label Analysis", style = MaterialTheme.typography.titleLarge)
+                            FilledTonalIconButton(
+                                onClick = { showRawJson = !showRawJson },
+                                colors = if (showRawJson) IconButtonDefaults.filledIconButtonColors() // solid = active
+                                else IconButtonDefaults.filledTonalIconButtonColors() // tonal = inactive, still a clear button
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DataObject,
+                                    contentDescription = if (showRawJson) "Show table view" else "Show raw JSON",
+                                )
+                            }
+                        }
                         Spacer(Modifier.padding(top = 8.dp))
-                        Text(
-                            state.analysisJson,
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        if (showRawJson) {
+                            Text(
+                                state.analysisJson,
+                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            FoodAnalysisTable(state.analysisJson)
+                        }
                     }
                 }
             }
@@ -759,4 +785,111 @@ private fun ColoredTabIconVector(
             Icon(icon, contentDescription = contentDescription, tint = Color.White)
         }
     }
+}
+
+/** One row of the human-readable analysis table: a field label and its display value. */
+private data class AnalysisRow(val field: String, val value: String)
+
+/** Renders the backend's `{"foods": [...]}` analysis JSON (see LabelAnalysis/FdaMatch in
+ *  main_server.py/fda_matcher.py) as one 2-column (field/value) table per detected product,
+ *  the human-readable alternative to the raw-JSON view toggled by the {} icon. Field order and
+ *  labels are hand-picked to match the known backend schema rather than a generic/alphabetical
+ *  JSON flatten, since a fixed field like "Ingredients" reads better than a derived key name. */
+@Composable
+private fun FoodAnalysisTable(analysisJson: String) {
+    val foods = remember(analysisJson) { parseFoodsFromAnalysisJson(analysisJson) }
+
+    if (foods.isEmpty()) {
+        Text("No food products detected.", style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        foods.forEachIndexed { index, food ->
+            Column {
+                val heading = food.optString("product_name").ifBlank { null }
+                Text(
+                    "Product ${index + 1}" + (heading?.let { ": $it" } ?: ""),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.padding(top = 4.dp))
+                AnalysisRowsTable(buildAnalysisRows(food))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalysisRowsTable(rows: List<AnalysisRow>) {
+    Column(Modifier.fillMaxWidth()) {
+        rows.forEachIndexed { index, row ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                Text(
+                    row.field,
+                    modifier = Modifier.weight(0.4f),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    row.value,
+                    modifier = Modifier.weight(0.6f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (index != rows.lastIndex) Divider()
+        }
+    }
+}
+
+/** analysisJson is the backend's pretty-printed `analysis` object, `{"foods": [...]}`. */
+private fun parseFoodsFromAnalysisJson(analysisJson: String): List<JSONObject> = try {
+    val foods = JSONObject(analysisJson).optJSONArray("foods") ?: JSONArray()
+    (0 until foods.length()).map { foods.getJSONObject(it) }
+} catch (e: Exception) {
+    emptyList()
+}
+
+/** A JSON scalar/array rendered for display: null/missing -> em dash, an array joined with
+ *  commas (empty array included, since "no allergens listed" is meaningfully different from
+ *  a missing field, but both currently render the same way, an em dash, matching how a user
+ *  reads "nothing here" either way). */
+private fun displayValue(value: Any?): String = when {
+    value == null || value == JSONObject.NULL -> "—"
+    value is JSONArray -> if (value.length() == 0) "—" else
+        (0 until value.length()).joinToString(", ") { value.get(it).toString() }
+    else -> value.toString().ifBlank { "—" }
+}
+
+private fun buildAnalysisRows(food: JSONObject): List<AnalysisRow> {
+    val rows = mutableListOf<AnalysisRow>()
+    val simpleFields = listOf(
+        "product_name" to "Product Name",
+        "brand_name" to "Brand Name",
+        "lot_number" to "Lot Number",
+        "expiration_date" to "Expiration Date",
+        "manufacturer" to "Manufacturer",
+        "ingredients" to "Ingredients",
+        "allergens" to "Allergens",
+        "nutrition_claims" to "Nutrition Claims",
+        "visible_text" to "Visible Text",
+    )
+    for ((key, label) in simpleFields) {
+        rows += AnalysisRow(label, displayValue(food.opt(key)))
+    }
+
+    food.optJSONObject("fda_match")?.let { fda ->
+        rows += AnalysisRow("FDA Match", displayValue(fda.opt("selected_match")))
+        val confidence = fda.opt("confidence")
+        if (confidence is Number) {
+            rows += AnalysisRow("FDA Match Confidence", "${(confidence.toDouble() * 100).toInt()}%")
+        }
+        rows += AnalysisRow("Other FDA Candidates", displayValue(fda.opt("other_matches")))
+        rows += AnalysisRow(
+            "FDA Verification Required",
+            if (fda.optBoolean("verification_required", true)) "Yes" else "No"
+        )
+    }
+
+    return rows
 }
